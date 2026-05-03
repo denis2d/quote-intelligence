@@ -310,12 +310,18 @@ function addSheetRow(defaultUrl = '') {
 
 function extractSheetId(raw) {
   raw = raw.trim();
-  // full URL
   const m = raw.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
   if (m) return m[1];
-  // bare ID (alphanumeric + _ -)
   if (/^[a-zA-Z0-9_-]{20,}$/.test(raw)) return raw;
   return null;
+}
+
+function extractGid(raw) {
+  raw = raw.trim();
+  // try #gid= first (hash fragment), then ?gid= (query param)
+  const m = raw.match(/[#?&]gid=(\d+)/);
+  if (m) return m[1];
+  return '0';
 }
 
 async function loadSheet(idx) {
@@ -335,9 +341,8 @@ async function loadSheet(idx) {
   btn.disabled = true;
   setStatus(idx, 'loading', 'fetching…');
 
-  // Try to fetch all sheets (gid=0 first, then discover tabs via export)
-  // We fetch the default sheet (gid=0) as CSV
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+  const gid = extractGid(raw);
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
 
   try {
     const res = await fetch(csvUrl);
