@@ -243,6 +243,16 @@
     <div class="sheets-summary" id="sheetsSummary" style="display:none"></div>
   </div>
 
+  <!-- API KEY -->
+  <div class="sheets-panel" style="margin-bottom:14px">
+    <div class="panel-title">// Gemini API Key — <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--accent3);text-decoration:none">get free key at aistudio.google.com</a></div>
+    <div class="sheet-row">
+      <span class="sheet-label" style="color:var(--muted)">Key</span>
+      <input class="sheet-input" id="geminiKey" type="password" placeholder="Paste your Gemini API key here (stored in memory only, never sent anywhere else)" />
+      <span class="sheet-status status-idle" id="keyStatus">not set</span>
+    </div>
+  </div>
+
   <!-- QUERY -->
   <div class="query-section">
     <div class="query-label">// Your question</div>
@@ -476,23 +486,35 @@ async function askQuestion() {
 SHEET DATA:
 ${ctx}`;
 
+  const apiKey = document.getElementById('geminiKey').value.trim();
+  if (!apiKey) {
+    answerBody.innerHTML = '<div class="error-msg">// Paste your Gemini API key above first</div>';
+    btn.disabled = false; btn.textContent = 'Ask →';
+    return;
+  }
+
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const response = await fetch(geminiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1500,
-        system: systemPrompt,
-        messages: [{ role: "user", content: q }]
+        contents: [{
+          parts: [{ text: systemPrompt + "\n\nUser question: " + q }]
+        }],
+        generationConfig: { maxOutputTokens: 1500 }
       })
     });
 
     const data = await response.json();
     if (data.error) throw new Error(data.error.message);
-    const answer = data.content?.[0]?.text || 'No response.';
+    const answer = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response.';
     const formatted = answer.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     answerBody.innerHTML = `<div class="answer-body">${formatted}</div>`;
+
+    // mark key as working
+    document.getElementById('keyStatus').className = 'sheet-status status-ok';
+    document.getElementById('keyStatus').textContent = 'active';
 
     history.unshift({ q, a: answer });
     renderHistory();
@@ -500,6 +522,8 @@ ${ctx}`;
 
   } catch (err) {
     answerBody.innerHTML = `<div class="error-msg">// Error: ${err.message}</div>`;
+    document.getElementById('keyStatus').className = 'sheet-status status-err';
+    document.getElementById('keyStatus').textContent = 'key error';
   }
 
   btn.disabled = false;
